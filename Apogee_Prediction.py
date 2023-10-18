@@ -116,7 +116,7 @@ def predictApogeeSansSecantAnalytic(m, Cd, A, v, a):
     rho = (2116*((59+459.7-.00356*(a*3.281))/518.6)**5.256)/(1718*(59+459.7-.00356*(a*3.281)))*515.4
     return ((-m)/(rho*Cd*A))*math.log(((rho*Cd*A)/(2*m*g))*v**2+1)+v*math.sqrt((2*m)/(g*rho*Cd*A))*math.atan(v*math.sqrt((rho*Cd*A)/(2*m*g)))+a
 
-# Runge-Kutts model for calculating old model
+# Runge-Kutta model for calculating old model
 def predictApogeeSansSecantRK4(v, a, time):
     vI = v
     aI = a
@@ -159,7 +159,7 @@ perErrorSecRK4 = []
 perErrorSansRK4 = []
 times = []
 
-for i in range(startIndx,endIndx):
+for i in range(startIndx, endIndx):
     a = alt.iloc[i]
     #v, b = np.polyfit(time.iloc[i - smoothingFactorBack : i + smoothingFactorForward],alt.iloc[i - smoothingFactorBack : i + smoothingFactorForward],1) / 3.281
     v = velo.iloc[i]
@@ -171,10 +171,10 @@ for i in range(startIndx,endIndx):
     print(apoSecEuler - apoSecRK4)
     print(apoSecRK4)
 
-    perErrorSansAnalytic.append(apoSansAnalytic-(trueApo))/(trueApo)*100
-    perErrorSecEuler.append(apoSecEuler-(trueApo))/(trueApo)*100
-    perErrorSecRK4.append(apoSecRK4-(trueApo))/(trueApo)*100
-    perErrorSansRK4.append(apoSansRK4-(trueApo))/(trueApo)*100
+    perErrorSansAnalytic.append((apoSansAnalytic-(trueApo))/(trueApo)*100)
+    perErrorSecEuler.append((apoSecEuler-(trueApo))/(trueApo)*100)
+    perErrorSecRK4.append((apoSecRK4-(trueApo))/(trueApo)*100)
+    perErrorSansRK4.append((apoSansRK4-(trueApo))/(trueApo)*100)
     times.append(time.iloc[i])
 
 
