@@ -4,27 +4,40 @@ import math
 import numpy as np
 from scipy import optimize
 import matplotlib.pyplot as plt
+import filterpy
 
-fileName = "out.csv"
-timeColName = "# Time (s)"
-veloColName = " Vz (m/s)"
-altColName = " Z (m)"
+fileName = "./data/flight_data_2.csv"
+timeColName = "time"
+veloColName = "baro_height"
+altColName = "baro_height"
+accxColName = "bmx_x_accel"
+accyColName = "bmx_y_accel"
+acczColName = "bmx_z_accel"
+gyroxColName = "bmx_x_gyro"
+gyroyColName = "bmx_y_gyro"
+gyrozColName = "bmx_z_gyro"
 
 time = pd.DataFrame()
 velo = pd.DataFrame()
 alt = pd.DataFrame()
+accx = pd.DataFrame()
+accy = pd.DataFrame()
+accz = pd.DataFrame()
+gyrox = pd.DataFrame()
+gyroy = pd.DataFrame()
+gyroz = pd.DataFrame()
 
 
 m = 15
 Cd = .333
 A = math.pi *(.155/2)**2
-g = 9.8
+g = 9.81
 a=0
 v=0
 rho=0
 vterm=0
 timestep = .01
-theta = math.pi/12
+theta = math.pi/6
 
 # Number of data points to use to smooth velocity (i - smoothingFactorBack : i + smoothingFactorForward)
 smoothingFactorBack = 1
@@ -34,8 +47,13 @@ data = pd.read_csv(fileName)
 time = data[timeColName]
 velo = data[veloColName]
 alt = data[altColName]
-
-trueApo = alt.max()
+accx = data[accxColName]
+accy = data[accyColName]
+accz = data[acczColName]
+gyrox = data[gyroxColName]
+gyroy = data[gyroyColName]
+gyroz = data[gyrozColName]
+trueApo = alt.max()/3.281
 
 # Old (incorrect) model. Here for reference
 def vDotSansSecant(m, rho, Cd, A, vy):
@@ -68,7 +86,6 @@ def predictApogeeSecantEuler(v, theta, a, time):
         thetaI += dTheta*timestep
 
         timeI += timestep
-    print("Eul", timeI)
     theta = theta + thetaDot(theta, v)*timestep
     return theta, aI
 
@@ -108,7 +125,6 @@ def predictApogeeSecantRK4(v, theta, a, time):
             changedTheta = True
         aI += vI*timestep
         timeI += timestep
-    print("RK4", timeI)
     return theta, aI
 
 # Analytic solution for old model
@@ -137,19 +153,19 @@ def predictApogeeSansSecantRK4(v, a, time):
         vI += (dV1 + 2*dV2 + 2*dV3 + dV4)*timestep/6
         aI += vI*timestep
         timeI += timestep
-    print("San", timeI)
     return aI
+
 
 
 
 startIndx = -1
 endIndx = -1
-for i in range(200, 900):
-    #v, b = np.polyfit(time.iloc[i - smoothingFactorBack : i + smoothingFactorForward],alt.iloc[i - smoothingFactorBack : i + smoothingFactorForward],1) / 3.281
-    v = velo.iloc[i]
+for i in range(400, 900):
+    v, b = np.polyfit(time.iloc[i - smoothingFactorBack : i + smoothingFactorForward],alt.iloc[i - smoothingFactorBack : i + smoothingFactorForward],1) / 3.281
+    #v = velo.iloc[i]
     if (v < 248 and startIndx == -1):
         startIndx = i
-    if (alt.iloc[i] == trueApo and endIndx == -1):
+    if (alt.iloc[i] == alt.max() and endIndx == -1):
         endIndx = i
 thetaSecEuler = theta
 thetaSecRK4 = theta
@@ -157,39 +173,69 @@ perErrorSansAnalytic = []
 perErrorSecEuler = []
 perErrorSecRK4 = []
 perErrorSansRK4 = []
+apoE = []
+apoSA = []
+apoSR = []
+apoR = []
 times = []
+alts = []
 
+file = open("predictions_100_Derivative.csv", 'w', newline='')
+out = csv.writer(file)
+out.writerow(["Time", "Altitude", "Euler Prediction", "Euler Error", "RK4 Prediction", "RK4 Error"])
+
+
+velo_alpha = 1
+
+v, b = np.polyfit(time.iloc[startIndx-1 - smoothingFactorBack : startIndx-1 + smoothingFactorForward],alt.iloc[startIndx-1 - smoothingFactorBack : startIndx-1 + smoothingFactorForward],1) / 3.281
 for i in range(startIndx, endIndx):
-    a = alt.iloc[i]
+    a = alt.iloc[i]/3.281
     #v, b = np.polyfit(time.iloc[i - smoothingFactorBack : i + smoothingFactorForward],alt.iloc[i - smoothingFactorBack : i + smoothingFactorForward],1) / 3.281
-    v = velo.iloc[i]
-    print("Apo", time.iloc[endIndx])
+    #v = velo.iloc[i]
+    ax = accx.iloc[i]
+    ay = accy.iloc[i]
+    az = accz.iloc[i]
+    acc = math.sqrt(ax**2 + ay**2 + az**2)
+
+
+    gx = gyrox.iloc[i]
+    gy = gyroy.iloc[i]
+    gz = gyroz.iloc[i]
+
+    v_alt_deriv, b = np.polyfit(time.iloc[i - smoothingFactorBack : i + smoothingFactorForward],alt.iloc[i - smoothingFactorBack : i + smoothingFactorForward],1) / 3.281
+    v_acc_int = v + (acc*(time.iloc[i]-time.iloc[i-1]))*math.cos(thetaSecRK4)
+
+    v = velo_alpha*v_alt_deriv + (1 - velo_alpha)*v_acc_int
+    print(v, v_alt_deriv)
+
     apoSansAnalytic = predictApogeeSansSecantAnalytic(m, Cd, A, v, a)
     thetaSecEuler, apoSecEuler = predictApogeeSecantEuler(v, thetaSecEuler, a, time.iloc[i])
     thetaSecRK4, apoSecRK4 = predictApogeeSecantRK4(v, thetaSecRK4, a, time.iloc[i])
     apoSansRK4 = predictApogeeSansSecantRK4(v, a, time.iloc[i])
-    print(apoSecEuler - apoSecRK4)
-    print(apoSecRK4)
 
     perErrorSansAnalytic.append((apoSansAnalytic-(trueApo))/(trueApo)*100)
     perErrorSecEuler.append((apoSecEuler-(trueApo))/(trueApo)*100)
     perErrorSecRK4.append((apoSecRK4-(trueApo))/(trueApo)*100)
     perErrorSansRK4.append((apoSansRK4-(trueApo))/(trueApo)*100)
+    apoE.append(apoSecEuler)
+    apoR.append(apoSecRK4)
+    apoSA.append(apoSansAnalytic)
+    apoSR.append(apoSansRK4)
     times.append(time.iloc[i])
+    alts.append(a)
 
+    out.writerow([time.iloc[i], a, apoSecEuler, (apoSecEuler-(trueApo))/(trueApo)*100, apoSecRK4, (apoSecRK4-(trueApo))/(trueApo)*100])
 
 fig, ax = plt.subplots(2,2)
-ax[0,0].plot(times, perErrorSansAnalytic)
-ax[0,0].set_title("Analytic Sans Secant")
-ax[0,1].plot(times, perErrorSansRK4)
-ax[0,1].set_title("RK4 Sans Secant")
+ax[0,0].plot(times, apoE)
+ax[0,0].set_title("Euler Prediction")
+ax[0,1].plot(times, apoR)
+ax[0,1].set_title("RK4 Prediction")
 ax[1,0].plot(times, perErrorSecEuler)
-ax[1,0].set_title("Euler Secant")
+ax[1,0].set_title("Euler Error")
 ax[1,1].plot(times, perErrorSecRK4)
-ax[1,1].set_title("RK4 Secant")
+ax[1,1].set_title("RK4 Error")
 plt.show()
-plt.plot(times, perErrorSecRK4)
-plt.set_title("RK4 Secant")
-plt.show()
+
 
 
