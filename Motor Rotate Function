@@ -1,0 +1,157 @@
+// defines pins numbers: stepPins1-3 are ms1-3 and tell the motor whether to step or microstep. stepPin just tells the motor to step. dirPin sets the direction
+const int stepPin1 = 4; 
+const int stepPin2 = 5; 
+const int stepPin3 = 6; 
+const int dirPin = 2; 
+const int stepPin = 13;
+const int wavePinA = 11;
+const int wavePinB = 12;
+
+//global variables
+int oldencoderCount = 0;
+float currentAngle = 0, encoderCount = 0;
+
+ 
+void setup() {
+  // Sets the two pins as Outputs
+  Serial.begin(9600);
+  pinMode(stepPin1,OUTPUT); 
+  pinMode(stepPin2,OUTPUT); 
+  pinMode(stepPin3,OUTPUT); 
+  pinMode(dirPin,OUTPUT);
+  pinMode(stepPin, OUTPUT);
+  pinMode(wavePinA, INPUT);
+  pinMode(wavePinB, INPUT);
+  }
+
+//HIGH is CW
+float Rotate(float angle, int speed, int stepSize, int timeoutValue) {
+    //cw is true, ccw is false
+    //speed 1, 2, 3, 4; 4 is slowest, 1 is the fastest
+    //stepSize is 1(full step) - 16(16th step)
+    //declaring internal function variables
+    int newA = 0, newB = 0, oldA = 0, oldB = 0, stop = 0, c = 0;
+
+    //equation to make speeds at higher step sizes equal to 16th step sizes. 
+    c = ((16/stepSize)*speed*1000-1000)/500;
+
+    //checks whether the angle the user put requires the motor to spin CW or CWW and applies it
+    if (angle > currentAngle) {
+      digitalWrite(dirPin, HIGH);
+    }
+    if (angle < currentAngle) {
+      digitalWrite(dirPin, LOW);
+    }
+
+    //Determines which MS1-3 pins need what values for different step sizes
+    switch (stepSize) {
+      case 1:
+      digitalWrite(stepPin1, LOW);
+      digitalWrite(stepPin2, LOW);
+      digitalWrite(stepPin3, LOW);
+      break;
+      case 2:
+      digitalWrite(stepPin1, HIGH);
+      digitalWrite(stepPin2, LOW);
+      digitalWrite(stepPin3, LOW);
+      break;
+      speed*8;
+      case 4:
+      digitalWrite(stepPin1, LOW);
+      digitalWrite(stepPin2, HIGH);
+      digitalWrite(stepPin3, LOW);
+      break;
+      case 8:
+      digitalWrite(stepPin1, HIGH);
+      digitalWrite(stepPin2, HIGH);
+      digitalWrite(stepPin3, LOW);
+      break;
+      case 16:
+      digitalWrite(stepPin1, HIGH);
+      digitalWrite(stepPin2, HIGH);
+      digitalWrite(stepPin3, HIGH);
+      break;
+    }
+
+    //initiates motor clock
+    unsigned long StartTime = micros();
+
+      //main while loop that steps until submitted angle is reached; runs while the difference between the encoder-read angle and the submitted angle is less than 0.05 - might need to adjust this value
+      while(abs(angle*2 - encoderCount/300*360) > 1) {
+        Serial.println(encoderCount);
+        //standard step
+        digitalWrite(stepPin, LOW);
+        delayMicroseconds(500);
+        digitalWrite(stepPin, HIGH);
+        delayMicroseconds(500);
+        //extra time so that higher step sizes are the same speed, and the motor can be slowed down
+        
+
+        //checks the encoder values
+        if (digitalRead(wavePinA) == HIGH) {
+          newA = 1;
+        }
+        else {
+          newA = 0;
+        }
+        if (digitalRead(wavePinB) == HIGH) {
+          newB = 1;
+        }
+        else {
+          newB = 0;
+        }
+
+        //if there is a change in encoder values, decides whether to incriment or decrement the encoder angle
+        if ((newA != oldA) || (newB != oldB)) {
+          if (digitalRead(wavePinA) == HIGH) {
+            if (digitalRead(wavePinB) == LOW) {
+              encoderCount++;
+            }
+            else {
+              encoderCount--;
+            }
+          }
+          else {
+            if (digitalRead(wavePinB == HIGH)) {
+              encoderCount++;
+            }
+            else {
+              encoderCount--;
+            }
+          }
+        }
+        //assigns this loops vars to "old" variables to compare on the next loop
+        oldA = newA;
+        oldB = newB;
+
+        //calculates elapsed motor runtime
+        unsigned long CurrentTime = micros();
+        unsigned long ElapsedTime = CurrentTime - StartTime; 
+        //Serial.println(ElapsedTime);
+
+        //checks if the motor has moved in the time the user inputted
+        /*
+        if (ElapsedTime > (timeoutValue*10^6)) {
+          StartTime = micros();
+          if(encoderCount == oldencoderCount) {
+            stop = 1;
+            Serial.println("Motor has E-stopped");
+          }
+          oldencoderCount = encoderCount;
+        }
+        */
+      delayMicroseconds(500*c);
+      }
+      //updates the code to let future functions know whether to turn CW or CCW
+      currentAngle = encoderCount/300*360;
+      return(encoderCount/300*360);
+}
+
+void loop() {
+  digitalWrite(dirPin, HIGH);
+  Serial.println("Test");
+  delay(1000);
+  Rotate(1, 1, 16, 1000);
+  Rotate(180, 1, 16, 1000);
+  delay(100000000);
+}
