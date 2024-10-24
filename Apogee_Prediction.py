@@ -202,11 +202,11 @@ for i in range(startIndx, endIndx):
     gy = gyroy.iloc[i]
     gz = gyroz.iloc[i]
 
-    v_alt_deriv, b = np.polyfit(time.iloc[i - smoothingFactorBack : i + smoothingFactorForward],alt.iloc[i - smoothingFactorBack : i + smoothingFactorForward],1) / 3.281
+    v, b = np.polyfit(time.iloc[i - smoothingFactorBack : i + smoothingFactorForward],alt.iloc[i - smoothingFactorBack : i + smoothingFactorForward],1) / 3.281
     v_acc_int = v + (acc*(time.iloc[i]-time.iloc[i-1]))*math.cos(thetaSecRK4)
 
-    v = velo_alpha*v_alt_deriv + (1 - velo_alpha)*v_acc_int
-    print(v, v_alt_deriv)
+   # v = velo_alpha*v_alt_deriv + (1 - velo_alpha)*v_acc_int
+    print(v)
 
     apoSansAnalytic = predictApogeeSansSecantAnalytic(m, Cd, A, v, a)
     thetaSecEuler, apoSecEuler = predictApogeeSecantEuler(v, thetaSecEuler, a, time.iloc[i])

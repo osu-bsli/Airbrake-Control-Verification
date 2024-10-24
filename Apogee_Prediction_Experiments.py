@@ -42,8 +42,8 @@ vterm=0
 theta = 1.5
 
 # Number of data points to use to smooth velocity (i - smoothingFactorBack : i + smoothingFactorForward)
-smoothingFactorBack = 2
-smoothingFactorForward = 2
+smoothingFactorBack = 1
+smoothingFactorForward = 1
 
 data = pd.read_csv(fileName)
 time = data[timeColName]
@@ -67,7 +67,7 @@ def airDensity(a):
 
 # Current model: (m*dv/dt = -Fd*cos0 - Fg)
 def vDotSecant(m, rho, Cd, A, vy, theta):
-    return -g-(1/(2*m))*rho*Cd*A*vy**2*(1/math.cos(theta))
+    return -g-(1/(2*m))*rho*Cd*A*vy**2*(1/math.sin(theta))
 # Current model: (v*d0/dt = g*sin0) [Vector derivation]
 def thetaDot(theta, vy):
     return (g*math.sin(theta)*math.cos(theta))/vy
@@ -190,19 +190,22 @@ for i in range(startIndx, endIndx):
     a = alt.iloc[i]/3.281
     v, b = np.polyfit(time.iloc[i - smoothingFactorBack : i + smoothingFactorForward],alt.iloc[i - smoothingFactorBack : i + smoothingFactorForward],1) / 3.281
 
-    print(time.iloc[i], v, theta)
     times.append(time.iloc[i])
     # ~~~~~~ Experiments ~~~~~~~~
     for j in range(0,6):
         start = timer()
         x , pred = predictApogeeSecantRK4(v, theta, a, time.iloc[i], timesteps[j])
         end = timer()
-        rk4apos[j].append(pred)
+        rk4apos[j].append(pred) 
         rk4errs[j].append(pred-apogee)
         rk4tims[j].append(end-start)
-        print(end-start)
     theta -= thetaDot(theta, v)
+    if theta > 1.5 or theta < 0.0001:
+        theta = 0.0001
+
     # ~~~~~~~~~~~~~~~~~~~~~~~~~~~
+    print(time.iloc[i], v, theta, rk4apos[0][-1])
+
 
     out.writerow([time.iloc[i], a, rk4apos[0][-1], rk4errs[0][-1], rk4tims[0][-1], rk4apos[1][-1], rk4errs[1][-1], rk4tims[1][-1], rk4apos[2][-1], rk4errs[2][-1], rk4tims[2][-1], rk4apos[3][-1], rk4errs[3][-1], rk4tims[3][-1], rk4apos[4][-1], rk4errs[4][-1], rk4tims[4][-1], rk4apos[5][-1], rk4errs[5][-1], rk4tims[5][-1]])
 
